@@ -1,5 +1,23 @@
 package mapreduce
 
+import (
+  "os"
+  "sort"
+  "log"
+  "strconv"
+  "encoding/json"
+)
+
+type ByKey []KeyValue
+
+func (a ByKey) Len() int { return len(a) }
+func (a ByKey) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a ByKey) Less(i, j int) bool { 
+	p, _ := strconv.Atoi(a[i].Key)
+	q, _ := strconv.Atoi(a[j].Key)
+	return p < q
+}
+
 func doReduce(
 	jobName string, // the name of the whole MapReduce job
 	reduceTask int, // which reduce task this is
@@ -44,4 +62,35 @@ func doReduce(
 	//
 	// Your code here (Part I).
 	//
+	var err error
+	var kv KeyValue;
+	Slice := make([]KeyValue, 0);
+	for i := 0; i < nMap; i ++ {
+	  p, err := os.Open(reduceName(jobName, i, reduceTask))
+    if err != nil {
+        log.Fatal(err)
+    }
+	  f := json.NewDecoder(p)
+	  for ;; {
+	    err := f.Decode(&kv)
+	    if err != nil { break }
+	    Slice = append(Slice, kv)
+	  }
+	  p.Close()
+	}
+	p, err := os.Create(mergeName(jobName, reduceTask))
+  if err != nil {
+    log.Fatal(err)
+  }
+	enc := json.NewEncoder(p)
+	sort.Sort(ByKey(Slice))
+	for i := 0; i < len(Slice); i ++ {
+	  if i == 0 {
+	    enc.Encode(KeyValue{Slice[i].Key, reduceF(Slice[i].Key, []string{""})})
+	    continue
+	  }
+	  if Slice[i].Key == Slice[i - 1].Key { continue }
+      enc.Encode(KeyValue{Slice[i].Key, reduceF(Slice[i].Key, []string{""})})	
+    }
+  p.Close()
 }
