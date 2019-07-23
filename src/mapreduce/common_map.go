@@ -53,6 +53,17 @@ func doMap(
 	//
 	// Your code here (Part I).
 	//
+	var p [nReduce] *File
+	var enc [nReduce] *Encoder
+	for i := 0, i < nReduce;  i ++ {
+	  p[i] := os.Create(reduceName(jobName, mapTask, i))
+	  enc[i] = json.NewEncoder(p[i]);
+	}
+	a []KeyValue := mapF("test", inFile);
+	for _, kv := range a {
+	  h := ihash(kv.KeyValue);
+	  err := enc[h % nReduce].Encode(&kv)
+	}  
 }
 
 func ihash(s string) int {
