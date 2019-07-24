@@ -4,7 +4,7 @@ import (
   "os"
   "sort"
   "log"
-  "strconv"
+  //"strconv"
   "encoding/json"
 )
 
@@ -13,9 +13,9 @@ type ByKey []KeyValue
 func (a ByKey) Len() int { return len(a) }
 func (a ByKey) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a ByKey) Less(i, j int) bool { 
-	p, _ := strconv.Atoi(a[i].Key)
-	q, _ := strconv.Atoi(a[j].Key)
-	return p < q
+	//p, _ := strconv.Atoi(a[i].Key)
+	//q, _ := strconv.Atoi(a[j].Key)
+	return a[i].Key < a[j].Key
 }
 
 func doReduce(
@@ -78,19 +78,24 @@ func doReduce(
 	  }
 	  p.Close()
 	}
-	p, err := os.Create(mergeName(jobName, reduceTask))
+	p, err := os.Create(outFile)
   if err != nil {
     log.Fatal(err)
   }
+  var tmp []string
 	enc := json.NewEncoder(p)
 	sort.Sort(ByKey(Slice))
 	for i := 0; i < len(Slice); i ++ {
-	  if i == 0 {
-	    enc.Encode(KeyValue{Slice[i].Key, reduceF(Slice[i].Key, []string{""})})
-	    continue
-	  }
-	  if Slice[i].Key == Slice[i - 1].Key { continue }
-      enc.Encode(KeyValue{Slice[i].Key, reduceF(Slice[i].Key, []string{""})})	
-    }
+    tmp = append(tmp, Slice[i].Value);
+		if i == len(Slice) - 1 {
+      enc.Encode(KeyValue{Slice[i].Key, reduceF(Slice[i].Key, tmp)})
+      tmp = tmp[:0]	
+      continue;
+    }	
+		if Slice[i].Key != Slice[i + 1].Key {
+      enc.Encode(KeyValue{Slice[i].Key, reduceF(Slice[i].Key, tmp)})	
+      tmp = tmp[:0]
+    } 
+  }
   p.Close()
 }

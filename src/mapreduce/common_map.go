@@ -66,27 +66,27 @@ func doMap(
 	//
 	// Your code here (Part I).
 	//
-	var err error
-	var p [100] *os.File
-	var enc [100] *json.Encoder
+	p := make([]*os.File, 0);
+	enc := make([]*json.Encoder, 0);
 	for i := 0; i < nReduce;  i ++ {
-	  p[i], _ = os.Create(reduceName(jobName, mapTask, i))
+	  file, err := os.Create(reduceName(jobName, mapTask, i))
     if err != nil {
         log.Fatal(err)
     }
-	  enc[i] = json.NewEncoder(p[i])
+    p = append(p, file);
+	  enc = append(enc, json.NewEncoder(p[i]));
 	}
 	a := mapF("test", read(inFile))
 	for _, kv := range a {
 	  h := ihash(kv.Key)
-	  err := enc[h % nReduce].Encode(&kv)
+	  err := enc[h % nReduce].Encode(kv)
     if err != nil {
         log.Fatal(err)
     }
 	}
-  for i := 0; i < nReduce; i ++ {
-  	 p[i].Close()
-  }  
+	for _, f := range p {
+		f.Close();
+	}  
 }
 
 func ihash(s string) int {
