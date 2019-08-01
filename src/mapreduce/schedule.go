@@ -15,13 +15,27 @@ import (
 // existing registered workers (if any) and new ones as they register.
 //
 
-func RunTask(w string, args *DoTaskArgs, registerChan chan string) {
+func RunTask(w string, args *DoTaskArgs, registerChan chan string, p chan int) {
 	ok := call(w, "Worker.DoTask", args, new(struct{}))
+
+	go func() { registerChan <-w } ()
 	if (ok == false) {
-	  fmt.Printf("schedule error");
-	} 	  
-	registerChan <-w 
+		p <-args.TaskNumber;
+	  //fmt.Printf("schedule error");
+	} 
+/*	else {
+	  *num = *num + 1;
+	  fmt.Print(*num)
+	}*/ 
+  //registerChan <-w	  
 }
+
+/*func InputTask(p chan int, n int) {
+	for i := 0; i < n; i ++ {
+		p <-i;
+	}
+}*/
+
 
 
 func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, registerChan chan string) {
@@ -51,7 +65,28 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 	} else {
 	  n = nReduce
 	}
+	p := make(chan int, n)
 	for i := 0; i < n; i ++ {
+		p <-i;
+	}
+	//q := make(chan int, n)
+	//go InputTask(p, n) 
+	for ; ; {
+    timeout := make(chan bool, 1)
+    go func() {
+        time.Sleep(1e9)    //等待1秒钟
+        timeout <- true
+    }()
+    i := -1;
+    // 然后，我们把timeout这个channel利用起来
+    select {
+        case i = <-p:
+            // 从ch中读到数据
+        case <- timeout: { break; }
+            // 一直没有从ch中读取到数据，但从timeout中读取到数据
+    }
+		//i := <-p;
+		if i < 0 { break }
     w = <-registerChan
  	  args := new(DoTaskArgs)
 	  args.JobName = jobName
@@ -59,12 +94,14 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 	  args.TaskNumber = i
 	  args.NumOtherPhase = nReduce + nMap - n
 	  if (phase == mapPhase) { args.File = mapFiles[i] }
-	  go RunTask(w, args, registerChan);
+	  go RunTask(w, args, registerChan, p);
 	}
-  time.Sleep(2)
+  time.Sleep(1e9)
 	for i := 0; i < 2; i ++ {
 	  <-registerChan
-	} 
+	}
+  //close(p);
+  //close(registerChan);
 	   
 	fmt.Printf("Schedule: %v done\n", phase)
 }
